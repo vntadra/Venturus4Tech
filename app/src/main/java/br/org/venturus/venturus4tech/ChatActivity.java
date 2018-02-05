@@ -3,7 +3,6 @@ package br.org.venturus.venturus4tech;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.media.MediaPlayer;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -19,11 +18,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedInputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.List;
 
 import io.socket.emitter.Emitter;
 
@@ -62,18 +58,42 @@ public class ChatActivity extends AppCompatActivity {
 
                 JSONObject message = new JSONObject();
                 try {
-                    message.put("author", mNickname);
                     message.put("message", mMsgInput.getText().toString());
+                    message.put("author", mNickname);
+                    SocketManager.getInstance().getSocket().emit("message", message);
                 } catch (JSONException e) {
-
                 }
-
-                SocketManager.getInstance().getSocket().emit("messages", message);
             }
 
         });
 
         SocketManager.getInstance().getSocket().on("messages", new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                final JSONArray messages = (JSONArray) args[0];
+                final List<JSONObject> listMessages = new ArrayList<>();
+                for (int i=0; i<messages.length(); i++) {
+                    try {
+                        JSONObject message = messages.getJSONObject(i);
+                        listMessages.add(message);
+                    } catch (JSONException e) {
+                        // ignore
+                    }
+                }
+
+                ChatActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mAdapter.addAllMsgs(listMessages);
+                        playSound();
+                        mRecyclerView.smoothScrollToPosition(mAdapter.getItemCount()-1);
+                    }
+                });
+
+            }
+        });
+
+        SocketManager.getInstance().getSocket().on("message", new Emitter.Listener() {
             @Override
             public void call(Object... args) {
                 final JSONObject message = (JSONObject) args[0];
@@ -88,12 +108,13 @@ public class ChatActivity extends AppCompatActivity {
 
             }
         });
-
-
-        GetHistoryTask task = new GetHistoryTask();
-        task.execute();
     }
 
+    @Override
+    public void onBackPressed() {
+        logout();
+        super.onBackPressed();
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -111,11 +132,18 @@ public class ChatActivity extends AppCompatActivity {
                 toggleSoundPreference();
                 return true;
             case R.id.action_close:
+                logout();
                 finish();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void logout() {
+        SocketManager.getInstance().getSocket().disconnect();
+        mAdapter.addAllMsgs(new ArrayList<JSONObject>());
+        mAdapter.notifyDataSetChanged();
     }
 
 
@@ -146,48 +174,4 @@ public class ChatActivity extends AppCompatActivity {
         });
         mp.start();
     }
-
-
-    public class GetHistoryTask extends AsyncTask<Void, Void, JSONArray> {
-
-        @Override
-        protected JSONArray doInBackground(Void... params) {
-            JSONArray msgArray = null;
-
-            try {
-                URL url = new URL("http://192.168.2.117:3000/history");
-
-                HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                InputStream in = new BufferedInputStream(urlConnection.getInputStream());
-
-                Scanner s = new Scanner(in).useDelimiter("\\A");
-
-                String resultString = s.hasNext() ? s.next() : "";
-                msgArray = new JSONArray(resultString);
-
-                urlConnection.disconnect();
-            } catch (Exception e) {
-                msgArray = new JSONArray();
-            }
-
-
-            return msgArray;
-        }
-
-        @Override
-        protected void onPostExecute(JSONArray messages) {
-            super.onPostExecute(messages);
-            for (int i=0; i<messages.length(); i++) {
-                try {
-                    JSONObject message = messages.getJSONObject(i);
-                    mAdapter.addMsg(message);
-                } catch (JSONException e) {
-
-                }
-            }
-
-        }
-
-    }
-
 }

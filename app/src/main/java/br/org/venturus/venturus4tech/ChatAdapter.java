@@ -9,8 +9,12 @@ import android.widget.TextView;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Created by vntguca on 12/07/17.
@@ -59,12 +63,24 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ViewHolder> {
         try {
             String username = mData.get(position).getString("author");
             String msg = mData.get(position).getString("message");
-            String time = mData.get(position).getString("sent");
+
+            // Parse time
+            String receivedTime = mData.get(position).getString("time");
+            SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    Locale.getDefault());
+            Date date = parser.parse(receivedTime);
+            SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy - HH:mm:ss",
+                    Locale.getDefault());
+            String formattedTime = formatter.format(date);
+
             holder.mMessage.setText(msg);
             holder.mUsername.setText(username);
-            holder.mTime.setText(time);
-            holder.mUserInitial.setText(username.substring(0,1));
-        } catch (JSONException e) {
+            holder.mTime.setText(formattedTime);
+
+            if (username != null && username.length() >= 2) {
+                holder.mUserInitial.setText(username.substring(0, 1));
+            }
+        } catch (JSONException | ParseException e) {
             holder.mMessage.setText(e.getMessage());
         }
     }
@@ -76,6 +92,11 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ViewHolder> {
 
     public void addMsg(JSONObject msg) {
         mData.add(msg);
+        notifyDataSetChanged();
+    }
+
+    public void addAllMsgs(List<JSONObject> msgs) {
+        mData.addAll(msgs);
         notifyDataSetChanged();
     }
 }

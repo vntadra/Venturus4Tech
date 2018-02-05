@@ -24,7 +24,7 @@ public class SocketManager {
 
     private SocketManager() {
         try {
-            mSocket = IO.socket("http://192.168.2.117:3000");
+            mSocket = IO.socket("http://localhost:3000/");
         } catch (URISyntaxException e) {
             mSocket = null;
         }
